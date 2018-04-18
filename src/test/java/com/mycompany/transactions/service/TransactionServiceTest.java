@@ -13,6 +13,7 @@ import java.util.List;
 
 import static java.time.Instant.now;
 import static java.util.Arrays.asList;
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
@@ -61,7 +62,18 @@ public class TransactionServiceTest {
         Statistics expected = new Statistics(60,20,25,15,3);
 
         verify(transactionRepository).getRecentTransactions(60);
-        assertThat(statistics).isEqualToComparingFieldByField(expected);
+        assertThat(statistics).isEqualTo(expected);
     }
 
+    @Test
+    public void should_return_stats_with_zeros_when_there_are_no_txns_in_allowed_interval() {
+        given(transactionRepository.getRecentTransactions(60)).willReturn(emptyList());
+
+        Statistics statistics = transactionService.getStatistics();
+
+        Statistics expected = new Statistics(0,0,0,0,0);
+
+        verify(transactionRepository).getRecentTransactions(60);
+        assertThat(statistics).isEqualTo(expected);
+    }
 }

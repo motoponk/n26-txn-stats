@@ -12,6 +12,8 @@ import java.time.Instant;
 import java.util.DoubleSummaryStatistics;
 import java.util.List;
 
+import static java.lang.Double.NEGATIVE_INFINITY;
+import static java.lang.Double.POSITIVE_INFINITY;
 import static java.time.Instant.now;
 import static java.util.stream.Collectors.summarizingDouble;
 
@@ -53,12 +55,22 @@ public class TransactionService {
         Statistics statistics = new Statistics(
                 summaryStatistics.getSum(),
                 summaryStatistics.getAverage(),
-                summaryStatistics.getMax(),
-                summaryStatistics.getMin(),
+                getMax(summaryStatistics),
+                getMin(summaryStatistics),
                 summaryStatistics.getCount()
         );
 
         log.info("Statistics at Time : {} is {}", Instant.now(), statistics);
         return statistics;
+    }
+
+    private double getMax(DoubleSummaryStatistics stats) {
+        final double max = stats.getMax();
+        return NEGATIVE_INFINITY == max ? 0 : max;
+    }
+
+    private double getMin(DoubleSummaryStatistics stats) {
+        final double min = stats.getMin();
+        return POSITIVE_INFINITY == min ? 0 : min;
     }
 }
