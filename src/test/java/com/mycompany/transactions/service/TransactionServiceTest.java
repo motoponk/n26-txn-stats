@@ -1,5 +1,6 @@
 package com.mycompany.transactions.service;
 
+import com.mycompany.transactions.domain.Statistics;
 import com.mycompany.transactions.domain.Transaction;
 import com.mycompany.transactions.repository.TransactionRepository;
 import org.junit.Test;
@@ -8,8 +9,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
+import java.util.List;
+
 import static java.time.Instant.now;
+import static java.util.Arrays.asList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -40,6 +45,23 @@ public class TransactionServiceTest {
 
         verify(transactionRepository, never()).saveTransaction(transaction);
         assertThat(saved).isFalse();
+    }
+
+    @Test
+    public void should_return_stats_when_there_are_txns_in_allowed_interval() {
+        List<Transaction> txns = asList(
+                new Transaction(15, now().minusSeconds(10)),
+                new Transaction(25, now().minusSeconds(20)),
+                new Transaction(20, now().minusSeconds(50))
+        );
+        given(transactionRepository.getRecentTransactions(60)).willReturn(txns);
+
+        Statistics statistics = transactionService.getStatistics();
+
+        Statistics expected = new Statistics(60,20,25,15,3);
+
+        verify(transactionRepository).getRecentTransactions(60);
+        assertThat(statistics).isEqualToComparingFieldByField(expected);
     }
 
 }
