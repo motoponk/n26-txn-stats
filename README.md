@@ -6,4 +6,4 @@ How to run?
 
 Run tests: 
 
-`> ./mvnw test`
+`> ./mvnw test integration-test`
