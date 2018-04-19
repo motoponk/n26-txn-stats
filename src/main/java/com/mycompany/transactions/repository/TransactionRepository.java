@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 import java.util.*;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static java.time.Instant.now;
 import static java.util.stream.Collectors.toList;
@@ -16,18 +17,23 @@ import static java.util.stream.Collectors.toList;
 public class TransactionRepository {
 
     private final ConcurrentNavigableMap<Long, List<Transaction>> TRANSACTIONS = new ConcurrentSkipListMap();
+    private final ReentrantLock lock = new ReentrantLock();
 
     protected NavigableMap<Long, List<Transaction>> getTransactions() {
         return Collections.unmodifiableNavigableMap(TRANSACTIONS);
     }
 
     public void saveTransaction(Transaction txn) {
-        long timestamp = txn.getTimestamp().toEpochMilli();
-        if(!TRANSACTIONS.containsKey(timestamp)){
-            TRANSACTIONS.put(timestamp, new ArrayList());
+        lock.lock();
+        try {
+            long timestamp = txn.getTimestamp().toEpochMilli();
+            if (!TRANSACTIONS.containsKey(timestamp)) {
+                TRANSACTIONS.put(timestamp, new ArrayList());
+            }
+            TRANSACTIONS.get(timestamp).add(txn);
+        } finally {
+            lock.unlock();
         }
-        TRANSACTIONS.get(timestamp).add(txn);
-
         if(log.isTraceEnabled()) {
             printTransactions();
         }
@@ -38,12 +44,17 @@ public class TransactionRepository {
     }
 
     public List<Transaction> getRecentTransactions(long txnTimeIntervalInSeconds) {
-        long startingEpochSecond = now().minusSeconds(txnTimeIntervalInSeconds).toEpochMilli();
-        return TRANSACTIONS
-                .tailMap(startingEpochSecond)
-                .values()
-                .parallelStream()
-                .flatMap(Collection::parallelStream)
-                .collect(toList());
+        lock.lock();
+        try {
+            long startingEpochSecond = now().minusSeconds(txnTimeIntervalInSeconds).toEpochMilli();
+            return TRANSACTIONS
+                    .tailMap(startingEpochSecond)
+                    .values()
+                    .parallelStream()
+                    .flatMap(Collection::parallelStream)
+                    .collect(toList());
+        } finally {
+            lock.unlock();
+        }
     }
 }
