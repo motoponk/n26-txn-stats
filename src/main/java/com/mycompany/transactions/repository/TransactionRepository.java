@@ -4,9 +4,9 @@ import com.mycompany.transactions.domain.Transaction;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Repository;
 
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.ConcurrentNavigableMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 import static java.time.Instant.now;
 import static java.util.stream.Collectors.toList;
@@ -15,10 +15,19 @@ import static java.util.stream.Collectors.toList;
 @Slf4j
 public class TransactionRepository {
 
-    private final List<Transaction> TRANSACTIONS = new ArrayList();
+    private final ConcurrentNavigableMap<Long, List<Transaction>> TRANSACTIONS = new ConcurrentSkipListMap();
+
+    protected NavigableMap<Long, List<Transaction>> getTransactions() {
+        return Collections.unmodifiableNavigableMap(TRANSACTIONS);
+    }
 
     public void saveTransaction(Transaction txn) {
-        TRANSACTIONS.add(txn);
+        long timestamp = txn.getTimestamp().toEpochMilli();
+        if(!TRANSACTIONS.containsKey(timestamp)){
+            TRANSACTIONS.put(timestamp, new ArrayList());
+        }
+        TRANSACTIONS.get(timestamp).add(txn);
+
         if(log.isTraceEnabled()) {
             printTransactions();
         }
@@ -28,9 +37,13 @@ public class TransactionRepository {
         log.info(TRANSACTIONS.toString());
     }
 
-    public List<Transaction> getRecentTransactions(long txnTimeInterval) {
-        return TRANSACTIONS.stream()
-                .filter(txn -> Duration.between(txn.getTimestamp(), now()).getSeconds() <= txnTimeInterval)
+    public List<Transaction> getRecentTransactions(long txnTimeIntervalInSeconds) {
+        long startingEpochSecond = now().minusSeconds(txnTimeIntervalInSeconds).toEpochMilli();
+        return TRANSACTIONS
+                .tailMap(startingEpochSecond)
+                .values()
+                .parallelStream()
+                .flatMap(Collection::parallelStream)
                 .collect(toList());
     }
 }
